@@ -17,6 +17,7 @@ struct Process {
     int exec_918;
     int exec_648;
     int exec_384;
+    int exec_time; 
     int start_dealine;
     int stop_dealine;
 };
@@ -110,6 +111,14 @@ void edf(int isEE, struct Process* procs) {
     }
     else {
         printf("Starting EDF simulation in standard mode\n");
+        // Set max CPU frequency for all processes
+        for (int i = 0; i < sizeof(procs); i++) {
+            procs[i].exec_time = procs[i].exec_1188;
+        }
+    }
+
+    for (int time = 0; time < simTime; time++) {
+        
     }
 }
 
