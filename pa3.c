@@ -10,7 +10,7 @@ int w_648;
 int w_384;
 int w_idle;
 
-struct Poccess {
+struct Process {
     char name[5];
     int period;
     int exec_1188;
@@ -21,7 +21,7 @@ struct Poccess {
     int stop_dealine;
 };
 
-struct Poccess* init(char file[]) {
+struct Process* init(char file[]) {
     FILE *fp;
     fp = fopen(file, "r");
     char line[255];
@@ -65,7 +65,7 @@ struct Poccess* init(char file[]) {
     printf("%d proccess detected with a simulation time %d\n", processes, simTime);
 
     // Allocate memory for structs on heap
-    struct Poccess *procs = malloc(sizeof(struct Poccess) * processes);
+    struct Process *procs = malloc(sizeof(struct Process) * processes);
 
     row = 0;
     while (row < processes) {
@@ -104,7 +104,7 @@ struct Poccess* init(char file[]) {
     return procs;
 }
 
-void edf(int isEE, struct Poccess* procs) {
+void edf(int isEE, struct Process* procs) {
     if (isEE) {
         printf("Starting EDF simulation in EE mode\n");
     }
@@ -113,7 +113,7 @@ void edf(int isEE, struct Poccess* procs) {
     }
 }
 
-void rm(int isEE, struct Poccess* procs) {
+void rm(int isEE, struct Process* procs) {
     if (isEE) {
         printf("Starting RM simulation in EE mode\n");
     }
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    struct Poccess* procs = init(argv[1]);
+    struct Process* procs = init(argv[1]);
 
     int isEE;
     // Checks if in EE mode
