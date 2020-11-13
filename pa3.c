@@ -18,8 +18,14 @@ struct Process {
     int exec_648;
     int exec_384;
     int exec_time; 
-    int start_dealine;
-    int stop_dealine;
+    int start_deadline;
+    int stop_deadline;
+};
+
+struct Simulation {
+    int min;
+    int currProcess;
+    int pastProcess;
 };
 
 struct Process* init(char file[]) {
@@ -80,8 +86,8 @@ struct Process* init(char file[]) {
                     break;
                 case 1:
                     procs[row].period = atoi(attribute);
-                    procs[row].start_dealine = 0;
-                    procs[row].stop_dealine = atoi(attribute);
+                    procs[row].start_deadline = 1;
+                    procs[row].stop_deadline = atoi(attribute);
                     break;
                 case 2:
                     procs[row].exec_1188 = atoi(attribute);
@@ -112,13 +118,51 @@ void edf(int isEE, struct Process* procs) {
     else {
         printf("Starting EDF simulation in standard mode\n");
         // Set max CPU frequency for all processes
-        for (int i = 0; i < sizeof(procs); i++) {
+        for (int i = 0; i < processes; i++) {
             procs[i].exec_time = procs[i].exec_1188;
         }
     }
 
-    for (int time = 0; time < simTime; time++) {
-        
+    double edfCalc = 0.0;
+    for (int i = 0; i < processes; i++) {
+        edfCalc += procs[i].exec_time / procs[i].period;
+    }
+
+    if (edfCalc >= 1) {
+        printf("No schedule can be found with EDF\n");
+        exit(0);
+    }
+
+    struct Simulation sim;
+
+    for (int time = 1; time < simTime; time++) {
+        sim.currProcess = 0;
+        sim.min = procs[0].stop_deadline;
+        for (int i = 1; i < processes; i++) {
+            if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
+                sim.currProcess = i;
+                sim.min = procs[i].stop_deadline;
+            }
+        }
+
+        if (sim.currProcess != sim.pastProcess) {
+            printf("%-4d: Context switch to %s\n", time, procs[sim.currProcess].name);
+        }
+
+        procs[sim.currProcess].exec_time--;
+
+        if (procs[sim.currProcess].exec_time <= 0) {
+            if (isEE) {
+                // EE magic here
+            }
+            else {
+                procs[sim.currProcess].exec_time = procs[sim.currProcess].exec_1188;
+                procs[sim.currProcess].start_deadline += procs[sim.currProcess].period + 1;
+                procs[sim.currProcess].stop_deadline += procs[sim.currProcess].period + 1;
+            }
+        }
+
+        sim.pastProcess = sim.currProcess;
     }
 }
 
