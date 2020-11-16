@@ -256,11 +256,18 @@ void edf(int isEE, struct Process* procs) {
             if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
                 sim.currProcess = i;
                 sim.min = procs[i].stop_deadline;
+                sim.isIdle = 0;
             }
         }
 
         if (sim.currProcess != sim.pastProcess) {
-            printf("%-4d: Context switch to %s\n", time, procs[sim.currProcess].name);
+            if (sim.isIdle) {
+                printf("%-4d: IDLE\n", time);
+            }
+            else {
+                printf("%-4d: Context switch to %s\n", time, procs[sim.currProcess].name);
+            }
+            
         }
 
         procs[sim.currProcess].exec_time--;
