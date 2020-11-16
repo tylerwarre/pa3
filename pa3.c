@@ -224,7 +224,7 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
 }
 
 
-void edf(int isEE, struct Process* procs) {
+void edf(int isEE, int isEDF, struct Process* procs) {
     if (isEE) {
         printf("Starting EDF simulation in EE mode\n");
     }
@@ -236,15 +236,24 @@ void edf(int isEE, struct Process* procs) {
         }
     }
 
-    double edfCalc = 0.0;
-    for (int i = 0; i < processes; i++) {
-        edfCalc += procs[i].exec_time / procs[i].period;
+    // double edfCalc = 0.0;
+    // for (int i = 0; i < processes; i++) {
+    //     edfCalc += procs[i].exec_time / procs[i].period;
+    // }
+
+    // if (edfCalc >= 1) {
+    //     printf("No schedule can be found with EDF\n");
+    //     exit(0);
+    // }
+
+    int error = findOptimalFreq(procs, isEDF, isEE);
+
+    if(error){
+        printf("no feasible schedule could be found\n");
+        return;
     }
 
-    if (edfCalc >= 1) {
-        printf("No schedule can be found with EDF\n");
-        exit(0);
-    }
+
 
     struct Simulation sim;
 
@@ -259,11 +268,22 @@ void edf(int isEE, struct Process* procs) {
         //     }
         // }
 
-        for (int i = 0; i < processes; i++) {
-            if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
-                sim.currProcess = i;
-                sim.min = procs[i].stop_deadline;
-                sim.isIdle = 0;
+        if (isEDF) {
+            for (int i = 0; i < processes; i++) {
+                if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
+                    sim.currProcess = i;
+                    sim.min = procs[i].stop_deadline;
+                    sim.isIdle = 0;
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < processes; i++) {
+                if (procs[i].period < sim.min && time >= procs[i].start_deadline && i != sim.currProcess) {
+                    sim.currProcess = i;
+                    sim.min = procs[i].period;
+                    sim.isIdle = 0;
+                }
             }
         }
 
@@ -414,10 +434,10 @@ int main(int argc, char *argv[]) {
 
     // Checks scheduling type and launches simulation
     if (strcmp(argv[2],"EDF") == 0) {
-        edf(isEE, procs);
+        edf(isEE, 1, procs);
     }
     else if (strcmp(argv[2],"RM") == 0) {
-        rm(isEE, procs);
+        edf(isEE, 0, procs);
     }
     else {
         printf("Please select EDF or RM for the scheduling mode\n");
