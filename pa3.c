@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <limits.h>
+#include <float.h>
 
 int simTime;
 int processes;
@@ -122,6 +122,114 @@ struct Process* init(char file[]) {
 }
 
 
+//returns energy used in a certain time period, returns -1 if schedule is impossible
+double simulateEnergy(struct Process* procs, int freq[processes], int isEDF){
+
+    //copy processes
+    struct Process procsCopy[processes];
+    memcpy(procsCopy, procs, sizeof(struct Process)*processes);
+
+    //assign frequency and exec time for each process
+    for(int i = 0; i <processes; i++){
+        switch(freq[i]){
+            case 0:
+                procsCopy[i].optimal_time = procsCopy[i].exec_1188;
+                procsCopy[i].optimal_freq = 1188;
+                break;
+            case 1:
+                procsCopy[i].optimal_time = procsCopy[i].exec_918;
+                procsCopy[i].optimal_freq = 918;
+                break;
+            case 2:
+                procsCopy[i].optimal_time = procsCopy[i].exec_648;
+                procsCopy[i].optimal_freq = 648;
+                break;
+            case 3:
+                procsCopy[i].optimal_time = procsCopy[i].exec_384;
+                procsCopy[i].optimal_freq = 384;
+                break;
+        }
+        procsCopy[i].exec_time = procsCopy[i].optimal_time;
+    }
+
+    //simulate schedule
+    struct Simulation sim;
+    sim.totalEnergy = 0.0;
+    sim.currEnergy = 0.0;
+    sim.startTime = 1;
+    sim.pastProcess = 0;
+
+    for (int time = 1; time < simTime; time++) {
+        sim.currProcess = 0;
+        sim.min = simTime * 2;
+        sim.isIdle = 1;
+
+        for (int i = 0; i < processes; i++) {
+
+            //return error if any deadline was missed
+            if(procsCopy[i].stop_deadline < time) return -1;
+            if(isEDF) {
+                if (procsCopy[i].stop_deadline < sim.min && time >= procsCopy[i].start_deadline) {
+                    sim.currProcess = i;
+                    sim.min = procsCopy[i].stop_deadline;
+                    sim.isIdle = 0;
+                }
+            }
+            else{
+                if (procsCopy[i].period < sim.min && time >= procsCopy[i].start_deadline) {
+                    sim.currProcess = i;
+                    sim.min = procsCopy[i].period;
+                    sim.isIdle = 0;
+                }
+            }
+        }
+
+        if (sim.isIdle) {
+            sim.currProcess = processes + 1;
+        }
+
+
+        if (sim.currProcess != sim.pastProcess && time != 1) {
+            sim.startTime = time;
+            sim.totalEnergy += sim.currEnergy;
+            sim.currEnergy = 0;
+        }
+
+        //execute process and add energy used during execution
+        if(sim.isIdle){
+            sim.currEnergy += w_idle*0.001;
+        }
+        else {
+            procsCopy[sim.currProcess].exec_time--;
+            switch (procsCopy[sim.currProcess].optimal_freq) {
+                case 1188:
+                    sim.currEnergy += w_1188*0.001;
+                    break;
+                case 918:
+                    sim.currEnergy += w_918*0.001;
+                    break;
+                case 648:
+                    sim.currEnergy += w_648*0.001;
+                    break;
+                case 384:
+                    sim.currEnergy += w_384*0.001;
+                    break;
+            }
+        }
+
+        if (procsCopy[sim.currProcess].exec_time <= 0) {
+            procsCopy[sim.currProcess].exec_time = procsCopy[sim.currProcess].optimal_time;
+            procsCopy[sim.currProcess].start_deadline += procsCopy[sim.currProcess].period;
+            procsCopy[sim.currProcess].stop_deadline += procsCopy[sim.currProcess].period;
+        }
+
+        sim.pastProcess = sim.currProcess;
+    }
+    sim.totalEnergy += sim.currEnergy;
+    return sim.totalEnergy;
+}
+
+
 // brute-force function to determine optimal frequency for each process
 // Returns 1 if a schedule is impossible with no missed deadlines, 0 otherwise
 int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
@@ -161,11 +269,11 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
         time[i][3] = procs[i].exec_384;
     }
 
-    int lowestEnergy = INT_MAX;
+    double lowestEnergy = DBL_MAX;
     //arrays for frequency, energy use, and utilization for each process
     int freq[5];
     double utilization[5];
-    int totalEnergy;
+    double totalEnergy;
     double totalUtilization;
     int missedDeadlines;
     //nested loops check every possible combination of frequencies
@@ -186,11 +294,10 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
                             totalUtilization +=utilization[i];
                         }
 
-                        //check if schedule misses any deadlines by checking utilization ratio
-                        missedDeadlines = isEDF ? (totalUtilization > 1)
-                                                : (totalUtilization > processes * (pow(2, 1 / (double)processes) - 1));
+                        if(totalUtilization > 1)break;
+                        totalEnergy = simulateEnergy(procs, freq, isEDF);
 
-                        if(missedDeadlines) break;
+                        if(totalEnergy == -1) break;
                         if(totalEnergy < lowestEnergy) {
                             noPossibleSchedule = 0;
                             lowestEnergy = totalEnergy;
