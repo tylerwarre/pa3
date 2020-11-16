@@ -34,6 +34,7 @@ struct Simulation {
     int min;
     int currProcess;
     int pastProcess;
+    int isIdle;
 };
 
 struct Process* init(char file[]) {
@@ -237,7 +238,7 @@ void edf(int isEE, struct Process* procs) {
 
     double edfCalc = 0.0;
     for (int i = 0; i < processes; i++) {
-        edfCalc += (double)procs[i].exec_time / procs[i].period;
+        edfCalc += procs[i].exec_time / procs[i].period;
     }
 
     if (edfCalc >= 1) {
@@ -249,16 +250,35 @@ void edf(int isEE, struct Process* procs) {
 
     for (int time = 1; time < simTime; time++) {
         sim.currProcess = 0;
-        sim.min = procs[0].stop_deadline;
+        sim.min = simTime * 2;
+        sim.isIdle = 1;
 
-        //I think this for loop is supposed to initialize to 0, otherwise process 0 will never be scheduled
-        for (int i = 1; i < processes; i++) {
+        // for (int i = 0; i < processes; i++) {
+        //     if (time > procs[i].stop_deadline) {
+        //         printf("Deadline missed for %s\n", procs[i].name);
+        //     }
+        // }
+
+        for (int i = 0; i < processes; i++) {
             if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
                 sim.currProcess = i;
                 sim.min = procs[i].stop_deadline;
                 sim.isIdle = 0;
             }
         }
+
+        // if (time > 332 && time < 343) {
+        //     printf("\nDEBUG\n");
+        //     for (int y = 0; y < processes; y++) {
+        //         printf("%-4d: %-2s, %-4d, %-4d, %-4d\n", time, procs[y].name, procs[y].exec_time, procs[y].start_deadline, procs[y].stop_deadline);
+        //     }
+        //     printf("DEBUG\n");
+        // }
+
+        if (sim.isIdle) {
+            sim.currProcess = processes + 1;
+        }
+
 
         if (sim.currProcess != sim.pastProcess) {
             if (sim.isIdle) {
@@ -278,10 +298,8 @@ void edf(int isEE, struct Process* procs) {
             }
             else {
                 procs[sim.currProcess].exec_time = procs[sim.currProcess].exec_1188;
-
-                // is the +1 needed at the end?
-                procs[sim.currProcess].start_deadline += procs[sim.currProcess].period + 1;
-                procs[sim.currProcess].stop_deadline += procs[sim.currProcess].period + 1;
+                procs[sim.currProcess].start_deadline += procs[sim.currProcess].period;
+                procs[sim.currProcess].stop_deadline += procs[sim.currProcess].period;
             }
         }
 
