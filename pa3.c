@@ -247,9 +247,12 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
             utilization += (double)procs[i].exec_time / procs[i].period;
         }
 
-        int missedDeadline = isEDF?(utilization > 1)
-                                     :(utilization > 0.7435);
-        return missedDeadline;
+
+        if(isEDF)return (utilization > 1);
+
+        //returns error if missed deadlines are found in RM mode
+        int freq[5] = {0, 0, 0, 0, 0};
+        return (simulateEnergy(procs, freq, isEDF) == -1);
 
     }
 
