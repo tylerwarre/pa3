@@ -15,14 +15,10 @@ int w_idle;
 struct Process {
     char name[5];
     int period;
-    //execution times for different frequencies from highest to lowest
-    int time[4];
     int exec_1188;
     int exec_918;
     int exec_648;
     int exec_384;
-    //energy use for different frequencies from highest to lowest
-    int energy[4];
     int exec_time;
     int optimal_freq;
     int optimal_time;
@@ -35,6 +31,9 @@ struct Simulation {
     int currProcess;
     int pastProcess;
     int isIdle;
+    int startTime;
+    double currEnergy;
+    double totalEnergy;
 };
 
 struct Process* init(char file[]) {
@@ -141,29 +140,30 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
         }
 
         int missedDeadline = isEDF?(utilization > 1)
-                                     :(utilization > processes * (pow(2, 1 / processes) - 1));
+                                     :(utilization > 0.7435);
         return missedDeadline;
 
     }
 
+    int energy[processes][4];
+    int time[processes][4];
     //flag to check if any possible schedule is found
     int noPossibleSchedule = 1;
     for(int i = 0; i < processes; i++) {
-        procs[i].energy[0] = w_1188*procs[i].exec_1188;
-        procs[i].energy[1] = w_918*procs[i].exec_918;
-        procs[i].energy[2] = w_648*procs[i].exec_648;
-        procs[i].energy[3] = w_384*procs[i].exec_384;
+        energy[i][0] = w_1188*procs[i].exec_1188;
+        energy[i][1] = w_918*procs[i].exec_918;
+        energy[i][2] = w_648*procs[i].exec_648;
+        energy[i][3] = w_384*procs[i].exec_384;
 
-        procs[i].time[0] = procs[i].exec_1188;
-        procs[i].time[1] = procs[i].exec_918;
-        procs[i].time[2] = procs[i].exec_648;
-        procs[i].time[3] = procs[i].exec_384;
+        time[i][0] = procs[i].exec_1188;
+        time[i][1] = procs[i].exec_918;
+        time[i][2] = procs[i].exec_648;
+        time[i][3] = procs[i].exec_384;
     }
 
     int lowestEnergy = INT_MAX;
     //arrays for frequency, energy use, and utilization for each process
     int freq[5];
-    int energy[5];
     double utilization[5];
     int totalEnergy;
     double totalUtilization;
@@ -179,17 +179,16 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
                         totalUtilization = 0;
                         for(int i = 0; i < 5; i++){
                             //energy use for all process
-                            energy[i] = procs[i].energy[freq[i]];
                             //utilization for all process
-                            utilization[i] = (double)procs[i].time[freq[i]] / procs[i].period;
+                            utilization[i] = (double)time[i][freq[i]] / procs[i].period;
 
-                            totalEnergy += energy[i];
+                            totalEnergy += energy[i][freq[i]];
                             totalUtilization +=utilization[i];
                         }
 
                         //check if schedule misses any deadlines by checking utilization ratio
                         missedDeadlines = isEDF ? (totalUtilization > 1)
-                                                : (totalUtilization > 0.7435);
+                                                : (totalUtilization > processes * (pow(2, 1 / (double)processes) - 1));
 
                         if(missedDeadlines) break;
                         if(totalEnergy < lowestEnergy) {
@@ -211,7 +210,7 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
                                         procs[i].optimal_freq = 384;
                                         break;
                                 }
-                                procs[i].optimal_time = procs[i].time[freq[i]];
+                                procs[i].optimal_time = time[i][freq[i]];
                                 procs[i].exec_time = procs[i].optimal_time;
                             }
                         }
@@ -236,37 +235,23 @@ void edf(int isEE, int isEDF, struct Process* procs) {
         }
     }
 
-    // double edfCalc = 0.0;
-    // for (int i = 0; i < processes; i++) {
-    //     edfCalc += procs[i].exec_time / procs[i].period;
-    // }
-
-    // if (edfCalc >= 1) {
-    //     printf("No schedule can be found with EDF\n");
-    //     exit(0);
-    // }
-
     int error = findOptimalFreq(procs, isEDF, isEE);
 
     if(error){
-        printf("no feasible schedule could be found\n");
+        printf("No feasible schedule could be found\n");
         return;
     }
 
-
-
     struct Simulation sim;
+    sim.totalEnergy = 0.0;
+    sim.currEnergy = 0.0;
+    sim.startTime = 1;
+    sim.pastProcess = 0;
 
     for (int time = 1; time < simTime; time++) {
         sim.currProcess = 0;
         sim.min = simTime * 2;
         sim.isIdle = 1;
-
-        // for (int i = 0; i < processes; i++) {
-        //     if (time > procs[i].stop_deadline) {
-        //         printf("Deadline missed for %s\n", procs[i].name);
-        //     }
-        // }
 
         if (isEDF) {
             for (int i = 0; i < processes; i++) {
@@ -279,7 +264,7 @@ void edf(int isEE, int isEDF, struct Process* procs) {
         }
         else {
             for (int i = 0; i < processes; i++) {
-                if (procs[i].period < sim.min && time >= procs[i].start_deadline && i != sim.currProcess) {
+                if (procs[i].period < sim.min && time >= procs[i].start_deadline) {
                     sim.currProcess = i;
                     sim.min = procs[i].period;
                     sim.isIdle = 0;
@@ -287,126 +272,65 @@ void edf(int isEE, int isEDF, struct Process* procs) {
             }
         }
 
-        // if (time > 332 && time < 343) {
-        //     printf("\nDEBUG\n");
-        //     for (int y = 0; y < processes; y++) {
-        //         printf("%-4d: %-2s, %-4d, %-4d, %-4d\n", time, procs[y].name, procs[y].exec_time, procs[y].start_deadline, procs[y].stop_deadline);
-        //     }
-        //     printf("DEBUG\n");
-        // }
-
         if (sim.isIdle) {
             sim.currProcess = processes + 1;
         }
 
 
-        if (sim.currProcess != sim.pastProcess) {
-            if (sim.isIdle) {
-                printf("%-4d: IDLE\n", time);
+        if (sim.currProcess != sim.pastProcess && time != 1) {
+            if (sim.pastProcess == processes + 1) {
+                printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", time - sim.startTime, sim.currEnergy);
             }
             else {
-                printf("%-4d: Context switch to %s\n", time, procs[sim.currProcess].name);
+                printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, time - sim.startTime, sim.currEnergy);
             }
-            
-        }
-
-        procs[sim.currProcess].exec_time--;
-
-        if (procs[sim.currProcess].exec_time <= 0) {
-            if (isEE) {
-                // EE magic here
-            }
-            else {
-                procs[sim.currProcess].exec_time = procs[sim.currProcess].exec_1188;
-                procs[sim.currProcess].start_deadline += procs[sim.currProcess].period;
-                procs[sim.currProcess].stop_deadline += procs[sim.currProcess].period;
-            }
-        }
-
-        sim.pastProcess = sim.currProcess;
-    }
-}
-
-void rm(int isEE, struct Process* procs) {
-    //set a cpu frequency for each process
-    int error = findOptimalFreq(procs, 0, isEE);
-
-    if(error){
-        printf("no feasible schedule could be found");
-        return;
-    }
-
-
-    struct Simulation sim;
-    sim.currProcess = 0;
-    sim.pastProcess = 0;
-    double energy = 0.0;
-    int startTime = 1;
-    int idle = 0;
-    sim.min = INT_MAX;
-    for(int time = 1; time < simTime; time++){
-
-        //find process with shortest period to run
-        for (int i = 0; i < processes; i++) {
-            if (procs[i].period < sim.min && time >= procs[i].start_deadline && i != sim.currProcess) {
-                sim.currProcess = i;
-                sim.min = procs[i].period;
-                idle = 0;
-            }
-        }
-        if(idle) sim.currProcess = -1;
-
-
-
-        //switch context if new process is running
-        if (sim.currProcess != sim.pastProcess && time !=1) {
-            if(sim.pastProcess == -1){
-                printf("%-4d:   IDLE   IDLE   %d   %lf\n", startTime, time - 1, energy);
-            }
-            else {
-                printf("%-4d:   %s   %d   %d   %lf\n", startTime, procs[sim.pastProcess].name,
-                       procs[sim.pastProcess].optimal_freq, time-startTime, energy);
-                startTime = time;
-                energy = 0;
-            }
+            sim.startTime = time;
+            sim.totalEnergy += sim.currEnergy;
+            sim.currEnergy = 0;
         }
 
         //execute process and add energy used during execution
-        if(idle){
-            energy += w_idle*0.001;
+        if(sim.isIdle){
+            sim.currEnergy += w_idle*0.001;
         }
         else {
-            procs[sim.currProcess].exec_time--;
             switch (procs[sim.currProcess].optimal_freq) {
                 case 1188:
-                    energy += w_1188*0.001;
+                    sim.currEnergy += w_1188*0.001;
                     break;
                 case 918:
-                    energy += w_918*0.001;
+                    sim.currEnergy += w_918*0.001;
                     break;
                 case 648:
-                    energy += w_648*0.001;
+                    sim.currEnergy += w_648*0.001;
                     break;
                 case 384:
-                    energy += w_384*0.001;
+                    sim.currEnergy += w_384*0.001;
                     break;
             }
         }
 
-        //reschedule process if finished
-        if(!idle && procs[sim.currProcess].exec_time <= 0){
+        if (!sim.isIdle) {
+            procs[sim.currProcess].exec_time--;
+        }
+
+        if (procs[sim.currProcess].exec_time <= 0) {
             procs[sim.currProcess].exec_time = procs[sim.currProcess].optimal_time;
             procs[sim.currProcess].start_deadline += procs[sim.currProcess].period;
             procs[sim.currProcess].stop_deadline += procs[sim.currProcess].period;
-            sim.min = INT_MAX;
-            idle = 1;
         }
 
         sim.pastProcess = sim.currProcess;
-
+    }
+    
+    if (sim.isIdle) {
+        printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", (simTime + 1) - sim.startTime, sim.currEnergy);
+    }
+    else {
+        printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, (simTime + 1) - sim.startTime, sim.currEnergy);
     }
 
-
+    printf("Total Energy: %-6f\n", sim.totalEnergy);
 }
 
 
