@@ -34,6 +34,8 @@ struct Simulation {
     int startTime;
     double currEnergy;
     double totalEnergy;
+    int totalIdle;
+    int totalTime;
 };
 
 struct Process* init(char file[]) {
@@ -117,6 +119,7 @@ struct Process* init(char file[]) {
         row++;
     }
     printf("Init completed\n");
+    fclose(fp);
 
     return procs;
 }
@@ -333,30 +336,60 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
 }
 
 
-void edf(int isEE, int isEDF, struct Process* procs) {
-    if (isEE) {
+void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
+    FILE *fp;
+    char fName[32];
+
+    if (isEE && isEDF) {
+        strncpy(fName, "EDF_EE_", 32);
+        strcat(fName, inputFile);
+        strcat(fName, ".log");
+        fp = fopen(fName, "w+");
         printf("Starting EDF simulation in EE mode\n");
+        fprintf(fp, "Starting EDF simulation in EE mode\n");
+    }
+    else if (!isEE && isEDF)
+    {
+        strncpy(fName, "EDF_", 32);
+        strcat(fName, inputFile);
+        strcat(fName, ".log");
+        fp = fopen(fName, "w+");
+        printf("Starting EDF simulation in standard mode\n");
+        fprintf(fp, "Starting EDF simulation in standard mode\n");
+    }
+    else if (isEE && !isEDF) {
+        strncpy(fName, "RM_EE_", 32);
+        strcat(fName, inputFile);
+        strcat(fName, ".log");
+        fp = fopen(fName, "w+");
+        printf("Starting RM simulation in EE mode\n");
+        fprintf(fp, "Starting RM simulation in EE mode\n");
     }
     else {
-        printf("Starting EDF simulation in standard mode\n");
-        // Set max CPU frequency for all processes
-        for (int i = 0; i < processes; i++) {
-            procs[i].exec_time = procs[i].exec_1188;
-        }
+        strncpy(fName, "RM_", 32);
+        strcat(fName, inputFile);
+        strcat(fName, ".log");
+        fp = fopen(fName, "w+");
+        printf("Starting RM simulation in standard mode\n");
+        fprintf(fp, "Starting RM simulation in standard mode\n");
     }
 
     int error = findOptimalFreq(procs, isEDF, isEE);
 
     if(error){
         printf("No feasible schedule could be found\n");
+        fprintf(fp, "No feasible schedule could be found\n");
         return;
     }
+
 
     struct Simulation sim;
     sim.totalEnergy = 0.0;
     sim.currEnergy = 0.0;
     sim.startTime = 1;
     sim.pastProcess = 0;
+    sim.totalIdle = 0;
+    sim.totalTime = 0;
 
     for (int time = 1; time < simTime; time++) {
         sim.currProcess = 0;
@@ -365,6 +398,11 @@ void edf(int isEE, int isEDF, struct Process* procs) {
 
         if (isEDF) {
             for (int i = 0; i < processes; i++) {
+                if (procs[i].stop_deadline < time) {
+                    printf("Deadline missed for process %s\n", procs[i].name);
+                    fprintf(fp, "Deadline missed for process %s\n", procs[i].name);
+                    return;
+                }
                 if (procs[i].stop_deadline < sim.min && time >= procs[i].start_deadline) {
                     sim.currProcess = i;
                     sim.min = procs[i].stop_deadline;
@@ -374,6 +412,11 @@ void edf(int isEE, int isEDF, struct Process* procs) {
         }
         else {
             for (int i = 0; i < processes; i++) {
+                if (procs[i].stop_deadline < time) {
+                    printf("Deadline missed for process %s\n", procs[i].name);
+                    fprintf(fp, "Deadline missed for process %s\n", procs[i].name);
+                    return;
+                }
                 if (procs[i].period < sim.min && time >= procs[i].start_deadline) {
                     sim.currProcess = i;
                     sim.min = procs[i].period;
@@ -386,14 +429,17 @@ void edf(int isEE, int isEDF, struct Process* procs) {
             sim.currProcess = processes + 1;
         }
 
-
         if (sim.currProcess != sim.pastProcess && time != 1) {
             if (sim.pastProcess == processes + 1) {
                 printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", time - sim.startTime, sim.currEnergy);
+                fprintf(fp, "%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", time - sim.startTime, sim.currEnergy);
+                sim.totalIdle += time - sim.startTime;
             }
             else {
                 printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, time - sim.startTime, sim.currEnergy);
+                fprintf(fp, "%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, time - sim.startTime, sim.currEnergy);
             }
+            sim.totalTime += time - sim.startTime;
             sim.startTime = time;
             sim.totalEnergy += sim.currEnergy;
             sim.currEnergy = 0;
@@ -435,12 +481,23 @@ void edf(int isEE, int isEDF, struct Process* procs) {
     
     if (sim.isIdle) {
         printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", (simTime + 1) - sim.startTime, sim.currEnergy);
+        fprintf(fp, "%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", (simTime + 1) - sim.startTime, sim.currEnergy);
+        sim.totalIdle += (simTime + 1) - sim.startTime;
     }
     else {
         printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, (simTime + 1) - sim.startTime, sim.currEnergy);
+        fprintf(fp, "%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, (simTime + 1) - sim.startTime, sim.currEnergy);
     }
+    sim.totalTime += (simTime + 1) - sim.startTime;
 
     printf("Total Energy: %-6f\n", sim.totalEnergy);
+    fprintf(fp, "Total Energy: %-6f\n", sim.totalEnergy);
+    printf("Total Idle Time: %-4d (%-6f%%)\n", sim.totalIdle, ((double)sim.totalIdle / (double)simTime) * 100);
+    fprintf(fp, "Total Idle Time: %-4d (%-6f%%)\n", sim.totalIdle, ((double)sim.totalIdle / (double)simTime) * 100);
+    printf("Total sim time: %-4d\n", sim.totalTime);
+    fprintf(fp, "Total sim time: %-4d\n", sim.totalTime);
+
+    fclose(fp);
 }
 
 
@@ -468,10 +525,10 @@ int main(int argc, char *argv[]) {
 
     // Checks scheduling type and launches simulation
     if (strcmp(argv[2],"EDF") == 0) {
-        edf(isEE, 1, procs);
+        edf(isEE, 1, procs, argv[1]);
     }
     else if (strcmp(argv[2],"RM") == 0) {
-        edf(isEE, 0, procs);
+        edf(isEE, 0, procs, argv[1]);
     }
     else {
         printf("Please select EDF or RM for the scheduling mode\n");
