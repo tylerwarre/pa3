@@ -1,10 +1,10 @@
 Starting EDF simulation in standard mode
-1    w5   1188 1    0.625000 
-2    w2   1188 1    0.625000 
-3    w4   1188 1    0.625000 
-4    w3   1188 1    0.625000 
-5    w1   1188 1    0.625000 
-6    IDLE IDLE 295  24.780000 
+1    w5   1188 35   21.875000 
+36   w2   1188 40   25.000000 
+76   w4   1188 57   35.625000 
+133  w3   1188 104  65.000000 
+237  w1   1188 53   33.125000 
+290  IDLE IDLE 11   0.924000 
 301  w5   1188 35   21.875000 
 336  w2   1188 40   25.000000 
 376  IDLE IDLE 75   6.300000 
@@ -19,6 +19,6 @@ Starting EDF simulation in standard mode
 901  w5   1188 35   21.875000 
 936  w4   1188 25   15.625000 
 961  w2   1188 40   24.375000 
-Total Energy: 312.729000
-Total Idle Time: 531  (53.100000%)
-Total sim time: 1000
+Total Energy: 466.373000
+Total idle time: 247  (24.700000%)
+Total simulation time: 753 

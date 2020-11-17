@@ -20,5 +20,5 @@ Starting EDF simulation in EE mode
 895  w1   918  66   29.502000 
 961  w2   918  40   17.433000 
 Total Energy: 516.874000
-Total Idle Time: 0    (0.000000%)
-Total sim time: 1000
+Total idle time: 0    (0.000000%)
+Total simulation time: 1000
