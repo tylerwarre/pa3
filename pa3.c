@@ -338,7 +338,7 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
 }
 
 
-void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
+void scheduler(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
     FILE *fp;
     char fName[32];
 
@@ -530,10 +530,10 @@ int main(int argc, char *argv[]) {
 
     // Checks scheduling type and launches simulation
     if (strcmp(argv[2],"EDF") == 0) {
-        edf(isEE, 1, procs, argv[1]);
+        scheduler(isEE, 1, procs, argv[1]);
     }
     else if (strcmp(argv[2],"RM") == 0) {
-        edf(isEE, 0, procs, argv[1]);
+        scheduler(isEE, 0, procs, argv[1]);
     }
     else {
         printf("Please select EDF or RM for the scheduling mode\n");
