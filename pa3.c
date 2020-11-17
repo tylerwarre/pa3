@@ -178,6 +178,7 @@ double simulateEnergy(struct Process* procs, int freq[processes], int isEDF){
                     sim.isIdle = 0;
                 }
             }
+            //check priority among all processes
             else{
                 if (procsCopy[i].period < sim.min && time >= procsCopy[i].start_deadline) {
                     sim.currProcess = i;
@@ -242,6 +243,7 @@ int findOptimalFreq(struct Process *procs, int isEDF, int isEE) {
         for(int i = 0; i < processes; i++) {
             procs[i].optimal_freq = 1188;
             procs[i].optimal_time = procs[i].exec_1188;
+            procs[i].exec_time = procs[i].optimal_time;
         }
 
         //check is schedule is possible with no missed deadlines
@@ -396,6 +398,7 @@ void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
         sim.min = simTime * 2;
         sim.isIdle = 1;
 
+        //check for priority among all process
         if (isEDF) {
             for (int i = 0; i < processes; i++) {
                 if (procs[i].stop_deadline < time) {
@@ -429,23 +432,20 @@ void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
             sim.currProcess = processes + 1;
         }
 
+        //print out any context switches
         if (sim.currProcess != sim.pastProcess && time != 1) {
             if (sim.pastProcess == processes + 1) {
                 printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", time - sim.startTime, sim.currEnergy);
-                fprintf(fp, "%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", time - sim.startTime, sim.currEnergy);
-                sim.totalIdle += time - sim.startTime;
             }
             else {
                 printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, time - sim.startTime, sim.currEnergy);
-                fprintf(fp, "%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, time - sim.startTime, sim.currEnergy);
             }
-            sim.totalTime += time - sim.startTime;
             sim.startTime = time;
             sim.totalEnergy += sim.currEnergy;
             sim.currEnergy = 0;
         }
 
-        //execute process and add energy used during execution
+        //calculate energy used during execution
         if(sim.isIdle){
             sim.currEnergy += w_idle*0.001;
         }
@@ -466,10 +466,12 @@ void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
             }
         }
 
+        //run process for 1 sec
         if (!sim.isIdle) {
             procs[sim.currProcess].exec_time--;
         }
 
+        //reset deadlines and exec_time if process is finished
         if (procs[sim.currProcess].exec_time <= 0) {
             procs[sim.currProcess].exec_time = procs[sim.currProcess].optimal_time;
             procs[sim.currProcess].start_deadline += procs[sim.currProcess].period;
@@ -478,26 +480,16 @@ void edf(int isEE, int isEDF, struct Process* procs, char inputFile[]) {
 
         sim.pastProcess = sim.currProcess;
     }
-    
+
+    //print last process that ran before simulation ended
     if (sim.isIdle) {
         printf("%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", (simTime + 1) - sim.startTime, sim.currEnergy);
-        fprintf(fp, "%-4d %-4s %-4s %-4d %-4f \n", sim.startTime, "IDLE", "IDLE", (simTime + 1) - sim.startTime, sim.currEnergy);
-        sim.totalIdle += (simTime + 1) - sim.startTime;
     }
     else {
         printf("%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, (simTime + 1) - sim.startTime, sim.currEnergy);
-        fprintf(fp, "%-4d %-4s %-4d %-4d %-4f \n", sim.startTime, procs[sim.pastProcess].name, procs[sim.pastProcess].optimal_freq, (simTime + 1) - sim.startTime, sim.currEnergy);
     }
-    sim.totalTime += (simTime + 1) - sim.startTime;
 
     printf("Total Energy: %-6f\n", sim.totalEnergy);
-    fprintf(fp, "Total Energy: %-6f\n", sim.totalEnergy);
-    printf("Total Idle Time: %-4d (%-6f%%)\n", sim.totalIdle, ((double)sim.totalIdle / (double)simTime) * 100);
-    fprintf(fp, "Total Idle Time: %-4d (%-6f%%)\n", sim.totalIdle, ((double)sim.totalIdle / (double)simTime) * 100);
-    printf("Total sim time: %-4d\n", sim.totalTime);
-    fprintf(fp, "Total sim time: %-4d\n", sim.totalTime);
-
-    fclose(fp);
 }
 
 
